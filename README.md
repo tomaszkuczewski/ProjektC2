@@ -6,10 +6,10 @@ C - Network sockets TCP sender with editor
  - Split string
  
 # Usage
- - set ipv4 <name> <value>
- - set tcp <name> <value>
- - set random bytes <value>     - For payload
- - set output interface <name>
+ - set ipv4 name value
+ - set tcp name value
+ - set random bytes value>    - For payload
+ - set output interface name
  - exit
   
 # Field names for IPv4
