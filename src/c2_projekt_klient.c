@@ -53,25 +53,25 @@ const char g_szTcpHeaderName[7][2][20] =
 		{"Urgent pointer", "urgp",},
 };
 
-//Wysylanie pakietu, wykorzystanie funkcji bilbiotecznej do enkapsulacji, laczenie w liste i wyslanie socketem
+//Sending packets by the given IPv4/TCP struct
 void send_packet(struct iphdr ih, struct tcphdr th, char * int_name, unsigned int packet_count, unsigned int random_count);
 
-//Pobieranie tekstu pol naglowkow ze zmiennych globalnych i zwracanie rozmiaru tekstu
+//Getting the field
 void get_field(const char type, const void* const hdr, unsigned int id, char * out_buff, unsigned int * out_len);
 
-//Wypisywanie zformatowanej tabeli
+//Printing out console information
 void print_headers(const struct iphdr* const ih, const struct tcphdr* const th, const int random_bytes);
 
-//Wpisanie wartosci do pola w naglowku
+//Setting the field
 void set_field(char type, void* hdr, unsigned int id, char* str);
 
-//Pobieranie tekstu od uzytkownika (zwracanie danych z wewnatrz [0x00 oznacza blad])
+//Getting the text from the user
 char get_command(struct iphdr* const ih, struct tcphdr* const th, unsigned int * random_bytes, char * int_name);
 
-//Wyszukiwanie oraz ustawianie nazwy i IP interfejsu o danej nazwie
+//Setting up output interface
 char set_interface(struct iphdr * ih, char* output_name);
 
-//Wyszukiwanie skroconej nazwy pola w naglowku oraz zwracanie id pola jesli istnieje
+//Validating field name
 int is_valid_shortname(const char type, const char * const str);
 
 //int (*merge_packet) (struct ether_header* eh, struct iphdr* ih, struct tcphdr* th, int random_data, void** output_data);
@@ -80,20 +80,20 @@ void (*set_ipv4_field) (void* hdr, unsigned int id, char* str);
 void (*set_tcp_field) (void* hdr, unsigned int id, char* str);
 
 int main(void) {
-	//Pola naglowka IP oraz TCP
+	//Struct fields for IPv4 TCP
 	struct iphdr ipheader;
 	struct tcphdr tcpheader;
 
 	memset(&tcpheader, 0, sizeof(struct tcphdr));
 	memset(&ipheader, 0, sizeof(struct iphdr));
 
-	//Ilosc losowych danych
+	//Setting random data
 	unsigned int random_bytes = 0;
 
-	//Nazwa interfejsu (lo = local loopback)
+	//Setting up name for default interface
 	char interface_name[20] = "lo";
 
-	//Otwieranie biblioteki
+	//Dynamic loading the references
 	void* hlib = dlopen("./liblink.so", RTLD_NOW);
 	if(hlib == NULL)
 	{
@@ -102,7 +102,6 @@ int main(void) {
 		return -1;
 	}
 
-	//Ladowanie symbolu
 	merge_packet = dlsym(hlib, "merge_packet");
 	if(merge_packet == NULL)
 	{
@@ -111,7 +110,6 @@ int main(void) {
 		return -1;
 	}
 
-	//Otwieranie biblioteki
 	void* hiplib = dlopen("./ipv4lib.so", RTLD_NOW);
 	if(hiplib == NULL)
 	{
@@ -120,7 +118,6 @@ int main(void) {
 		return -1;
 	}
 
-	//Ladowanie symbolu
 	set_ipv4_field = dlsym(hiplib, "set_ipv4_field");
 	if(set_ipv4_field == NULL)
 	{
@@ -129,7 +126,6 @@ int main(void) {
 		return -1;
 	}
 
-	//Otwieranie biblioteki
 	void* htcplib = dlopen("./tcplib.so", RTLD_NOW);
 	if(htcplib == NULL)
 	{
@@ -138,7 +134,6 @@ int main(void) {
 		return -1;
 	}
 
-	//Ladowanie symbolu
 	set_tcp_field = dlsym(htcplib, "set_tcp_field");
 	if(set_tcp_field == NULL)
 	{
@@ -147,20 +142,19 @@ int main(void) {
 		return -1;
 	}
 
-
-	//Ustawianie domyslnego interfejsu na loopback
+	//Setting up the default interface
 	if(set_interface(&ipheader, interface_name) == 0x00)
 	{
 		printf("Nie mozna odnalezc interfejsu zwrotnego");
 		return -2;
 	}
 
-	//Domyslne wartosci RFC
+	//Default RFC values
 	ipheader.ihl = 5;
 	tcpheader.source = htons(80);
 	tcpheader.dest = htons(80);
 
-	//Wykonywanie seri wyswietlen pol naglowka oraz wysylanie zapytan o komende do uzytkownika
+	//Printing out the console messages
 	char return_code = 0x01;
 	while(return_code != 0x00)
 	{
@@ -276,7 +270,7 @@ void send_packet(struct iphdr ih, struct tcphdr th, char * int_name, unsigned in
 
 	if ((sockfd = socket(AF_PACKET, SOCK_RAW, IPPROTO_RAW)) == -1) { perror("socket"); }
 
-	//ID interfejsu
+	//interface ID
 	struct ifreq if_idx;
 	memset(&if_idx, 0, sizeof(struct ifreq));
 	strncpy(if_idx.ifr_name, int_name, IFNAMSIZ-1);
@@ -307,7 +301,7 @@ void send_packet(struct iphdr ih, struct tcphdr th, char * int_name, unsigned in
 	socket_address.sll_addr[2] = 0x22; socket_address.sll_addr[3] = 0x33;
 	socket_address.sll_addr[4] = 0x44; socket_address.sll_addr[5] = 0x55;
 
-	//Rest
+	//Reset of uneditable data
 	ih.version = 4;
 	ih.protocol = 6;
 	th.doff = 5;
@@ -320,7 +314,7 @@ void send_packet(struct iphdr ih, struct tcphdr th, char * int_name, unsigned in
 				+ sizeof(struct tcphdr) + random_count);
 	}
 
-	//Wypelnianie listy
+	//Filling the list for multiple packets
 	linked_list* list = create_list();
 	for(int i = 0; i < packet_count; i++)
 	{
@@ -329,7 +323,7 @@ void send_packet(struct iphdr ih, struct tcphdr th, char * int_name, unsigned in
 		add_element(list, packet_data, size);
 	}
 
-	//Usuwanie listy
+	//Sending element of list and then freeing it
 	while(list->size > 0)
 	{
 		unsigned int size = 0;
@@ -347,12 +341,12 @@ void print_headers(const struct iphdr* const ih, const struct tcphdr* const th, 
 	for(int i = 0; i < 20; i++) { printf("\n"); }
 	unsigned ipstrlen = 0, tcpstrlen = 0;
 	char ipstrbuff[64], tcpstrbuff[64];
-	//Gorny wiersz
+	//Upper rows
 	for(int i = 0; i < CONSOLE_WIDTH; i++) {printf("#");} printf("\n");
 	printf("# IP HEADER"); for(int i = 0; i < ((CONSOLE_WIDTH/2)-12); i++) {printf(" ");}
 	printf("# TCP HEADER"); for(int i = 0; i < ((CONSOLE_WIDTH/2)-12); i++) {printf(" ");} printf("#\n");
 	for(int i = 0; i < CONSOLE_WIDTH; i++) {printf("#");} printf("\n");
-	//Pisanie kolejnych wierszy
+	//Field rows
 	for(int i = 0; i < 7; i++)
 	{
 		//NULLowanie tablic
@@ -366,7 +360,7 @@ void print_headers(const struct iphdr* const ih, const struct tcphdr* const th, 
 		printf("# %s", tcpstrbuff);
 		for(int i = 0; i < ((CONSOLE_WIDTH/2) - tcpstrlen - 2); i++) { printf(" "); } printf("#\n");
 	}
-	//Dolny wiersz
+	//Bottom rows
 	for(int i = 0; i < CONSOLE_WIDTH; i++) {printf("#");} printf("\n");
 	printf("Ilosc danych losowych: %d", random_bytes);
 	printf("\nKomendy: \n\n");
@@ -401,7 +395,7 @@ void set_field(char type, void* hdr, unsigned int id, char* str)
 //			iph->daddr = addr.sin_addr.s_addr;
 //		}
 	}
-	if(type == 0x01)
+	else if(type == 0x01)
 	{
 		set_tcp_field(hdr, id, str);
 //		struct tcphdr * tcph = (struct tcphdr *) hdr;
@@ -417,7 +411,7 @@ void set_field(char type, void* hdr, unsigned int id, char* str)
 
 void get_field(const char type, const void* const hdr, unsigned int id, char * out_buff, unsigned int * out_len)
 {
-	//Typ IP
+	//IP type
 	if(type == 0x00)
 	{
 		const struct iphdr * const iph = (const struct iphdr * const) hdr;
@@ -440,7 +434,7 @@ void get_field(const char type, const void* const hdr, unsigned int id, char * o
 			*out_len = sprintf(out_buff, "%s: %s", out_buff, inet_ntoa(ip_addr) );
 		}
 	}
-	//Typ TCP
+	//TCP type
 	if(type == 0x01)
 	{
 		const struct tcphdr * const tcph = (const struct tcphdr * const) hdr;
@@ -468,7 +462,7 @@ int is_valid_shortname(const char type, const char * const str)
 			return i;//OK
 		}
 	}
-	return -1; //Nie znaleziono
+	return -1; //Not found
 }
 
 char set_interface(struct iphdr * ih, char* input_name)
